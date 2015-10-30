@@ -4,6 +4,7 @@
 #include <functional>
 #include <cmath>
 #include <algorithm>
+#include <cmath>
 
 using namespace std;
 
@@ -49,6 +50,16 @@ public:
 	double bvisible[nvisible];
 	double bhidden[nhidden];
 	double T = 1;
+	
+	int idx() {
+		int p = 1;
+		int ret = 0;
+		for(int i=0;i<nvisible;i++){
+			ret += p*((int)visible[i]);
+			p *= 2;
+		}
+		return ret;
+	}
 
 	double E() {
 		double ret = 0;
@@ -75,7 +86,7 @@ public:
 		update(&hidden[0],nhidden);
 	}
 
-	virtual double train1(const double rate, const int trainsize, bool trainingdata[][nvisible], int samplesize){
+	virtual void train(const double rate, const int trainsize, bool trainingdata[][nvisible], int samplesize){
 		double dw[nvisible+nhidden][nvisible+nhidden] = { 0 };
 		double dbvis[nvisible] = { 0 };
 		double dbhid[nhidden];
@@ -138,7 +149,7 @@ public:
 					hjj += ((double)ghidden[l][j]);
 				hj[j] += hjj/samplesize;
 				for(int k=0;k<nvisible;k++)
-					vihj[k][j] += trainingdata[i][k]*hj[j];
+					vihj[k][j] += ((double)trainingdata[i][k])*((double)hj[j]);
 			}
 		}
 		for(int i=0;i<nhidden;i++){
@@ -199,25 +210,7 @@ public:
 		for(int i=0;i<nvisible+nhidden;i++)
 			for(int j=0;j<nvisible+nhidden;j++)
 				w[i][j] += rate*dw[i][j];
-		////////////// calculate err ///////////////
-		double error = 0;
-		for(int i=0;i<nvisible;i++)
-			error = max(error,abs(dbvis[i]));
-		for(int i=0;i<nhidden;i++)
-			error = max(error,abs(dbhid[i]));
-		for(int i=0;i<nvisible+nhidden;i++)
-			for(int j=0;j<nvisible+nhidden;j++)
-				error = max(error,abs(dw[i][j]));
-		return error;
-	}
 
-	void train(const double rate, const int trainsize, bool trainingdata[][nvisible], int samplesize,
-	           function<void (int,double)> callback = [](int,double){} , double tol = 1e-6){
-		double err;
-		int count = 0;
-		while( (err=train1(rate,trainsize,trainingdata,samplesize)) > tol )
-			callback(count++,err);
-		callback(count++,err);
 	}
 };
 
@@ -234,7 +227,7 @@ public:
 				this->w[nvisible+i][nvisible+j] = 0;
 	}
 	
-	virtual double train1(const double rate, const int trainsize, bool trainingdata[][nvisible],int cd){
+	virtual void train(const double rate, const int trainsize, bool trainingdata[][nvisible],int cd){
 		double dw[nvisible][nhidden] = { 0 };
 		double dbvis[nvisible] = { 0 };
 		double dbhid[nhidden] = { 0 };
@@ -312,27 +305,21 @@ public:
 				this->w[nvisible+j][i] = this->w[i][nvisible+j];
 			}
 		}
-
-		////////////// calculate err ///////////////
-		double error = 0;
-		for(int i=0;i<nvisible;i++)
-			error = max(error,abs(dbvis[i]));
-		for(int i=0;i<nhidden;i++)
-			error = max(error,abs(dbhid[i]));
-		for(int i=0;i<nvisible;i++)
-			for(int j=0;j<nhidden;j++)
-				error = max(error,abs(dw[i][j]));
-		return error;
 	}
 
 };
 
 template <typename generate_t, typename learn_t>
-void generate_and_learn(generate_t &g, learn_t &l, double rate, int trainsize=1000, int samplesize=1, int skip=1){
+void generate_and_learn(generate_t &g, learn_t &l, double rate, int trainsize, int max_epochs, int szcd, int skip){
 	const int nvisible = sizeof(g.visible)/sizeof(bool);
 	const int nhidden1 = sizeof(g.hidden)/sizeof(bool);
 	const int nhidden2 = sizeof(l.hidden)/sizeof(bool);
+	const int ns = pow(2,nvisible);
 	bool training[trainsize][nvisible];
+	int stat_training[ns];
+	int stat_learned[ns];
+	fill(&stat_training[0],&stat_training[ns],0);
+	fill(&stat_learned[0], &stat_learned[ns],0);
 	// wait for thermal eq
 	for(int i=0;i<trainsize;i++){
 		g.update_hiddens();
@@ -343,10 +330,12 @@ void generate_and_learn(generate_t &g, learn_t &l, double rate, int trainsize=10
 		g.update_hiddens();
 		g.update_visibles();
 		copy(&g.visible[0],&g.visible[nvisible],&training[i][0]);
+		stat_training[g.idx()]++;
 	}
 	// train l
-	l.train(rate,trainsize,training,samplesize,[&](int c, double x){
-		if(c%skip!=0) return;
+	for(int c=0;c<max_epochs;c++){
+		l.train(rate,trainsize,training,szcd);
+		if(c%skip!=0) continue;
 		double err = 0;
 		for(int i=0;i<nvisible;i++)
 			err = max(err,abs(l.bvisible[i]-g.bvisible[i]));
@@ -358,30 +347,21 @@ void generate_and_learn(generate_t &g, learn_t &l, double rate, int trainsize=10
 				for(int j=0;j<nvisible+nhidden;j++)
 					err = max(err,abs(l.w[i][j]-g.w[i][j]));
 		}
-		//cout << "--------------------------\n";
-		cout << c << '\t' << x << '\t' << err << "\n";
-		/*cout << "---\nvis: ";
-		for(int i=0;i<nvisible;i++)
-			cout << l.visible[i] << "\t";
-		cout << "\nhid: ";
-		for(int i=0;i<nhidden2;i++)
-			cout << l.hidden[i] << "\t";
-		cout << "\nenergy: ";
-		cout << l.E() << "\n";
-		cout << "---\n";
-		for(int i=0;i<nvisible+nhidden2;i++){
-			for(int j=0;j<nvisible+nhidden2;j++)
-				cout << l.w[i][j] << "\t";
-			cout << "\n";
-		}
-		cout << "---\nbvis:";
-		for(int i=0;i<nvisible;i++)
-			cout << l.bvisible[i] << "\t";
-		cout << "\nbhid: ";
-		for(int i=0;i<nhidden2;i++)
-			cout << l.bhidden[i] << "\t";
-		cout << "\n";*/
-	});
+		cout << c << '\t' << err << endl;
+	}
+	// statistics of learned
+	for(int i=0;i<trainsize;i++){
+		l.update_hiddens();
+		l.update_visibles();
+	}
+	for(int i=0;i<trainsize;i++){
+		l.update_hiddens();
+		l.update_visibles();
+		stat_learned[l.idx()]++;
+	}
+	// print statistics
+	for(int i=0;i<ns;i++)
+		cout << stat_training[i] << "\t" << stat_learned[i] << endl;
 }
 
 int main(){
@@ -389,25 +369,9 @@ int main(){
 	random_device rd;
 	default_random_engine rengine(rd());
 	//////////////// Model 0 /////////////////
-	rbm<2,2,default_random_engine> source(rengine);
-	rbm<2,2,default_random_engine> learn(rengine);
-	generate_and_learn(source,learn, 0.001, 5000, 5, 100);
-	/*
-	bm<3,2,default_random_engine> m(rengine);
-	int stat[32] = { 0 };
-	double e[32] = { 0 };
-	for(int i=0;i<10000000;i++){
-		m.update_hiddens();
-		m.update_visibles();
-	}
-	for(int i=0;i<10000000;i++){
-		m.update_hiddens();
-		m.update_visibles();
-		int idx = 0;
-		idx = ((int)m.hidden[0])*16+((int)m.hidden[1])*8+((int)m.visible[0])*4+((int)m.visible[1])*2+((int)m.visible[2]);
-		stat[idx]++;
-		e[idx] = m.E();
-	}
-	for(int i=0;i<32;i++)
-		cout << stat[i] << "\t" << e[i] << endl;*/
+	bm<6,0,default_random_engine> source(rengine);
+	bm<6,0,default_random_engine> learn(rengine);
+	generate_and_learn(source,learn, 0.01,100000, 100000, 1000, 100);
+	generate_and_learn(source,learn, 0.001,100000, 100000, 1000, 100);
+	generate_and_learn(source,learn, 0.0001,100000, 100000, 1000, 100);
 }
