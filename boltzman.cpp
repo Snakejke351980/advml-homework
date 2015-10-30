@@ -1,4 +1,5 @@
 #include <iostream>
+#include <chrono>
 #include <string>
 #include <random>
 #include <functional>
@@ -339,8 +340,15 @@ void generate_and_learn(generate_t &g, learn_t &l, double rate, int trainsize, i
 		stat_training[g.idx()]++;
 	}
 	// train l
+	chrono::duration<double> elapsed_seconds(0);
 	for(int c=0;c<max_epochs;c++){
+		
+		auto start = chrono::steady_clock::now();
 		l.train(rate,trainsize,training,szcd);
+		auto end = chrono::steady_clock::now();
+		
+		elapsed_seconds += chrono::duration_cast<chrono::duration<double>>(end-start);
+		
 		if(c%skip!=0) continue;
 		double err = 0;
 		for(int i=0;i<nvisible;i++)
@@ -355,6 +363,8 @@ void generate_and_learn(generate_t &g, learn_t &l, double rate, int trainsize, i
 		}
 		cout << c << '\t' << err << "\n";
 	}
+	// output runing time
+	cout << "runing time: " << elapsed_seconds.count() << " seconds\n";
 	// statistics of learned
 	for(int i=0;i<trainsize;i++){
 		l.update_hiddens();
@@ -378,5 +388,5 @@ int main(){
 	//////////////// Model 0 /////////////////
 	bm<6,0,default_random_engine> source(rengine);
 	bm<6,0,default_random_engine> learn(rengine);
-	generate_and_learn(source,learn, 0.01,100000, 20000, 10000, 100);
+	generate_and_learn(source,learn, 0.01,100000, 30000, 10000, 100);
 }
