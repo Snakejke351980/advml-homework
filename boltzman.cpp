@@ -150,9 +150,10 @@ public:
 				double hjj = 0;
 				for(int l=0;l<samplesize;l++)
 					hjj += ((double)ghidden[l][j]);
-				hj[j] += hjj/samplesize;
+				hjj /= samplesize;
+				hj[j] += hjj;
 				for(int k=0;k<nvisible;k++)
-					vihj[k][j] += ((double)trainingdata[i][k])*((double)hj[j]);
+					vihj[k][j] += ((double)trainingdata[i][k])*((double)hjj);
 			}
 		}
 		for(int i=0;i<nhidden;i++){
@@ -215,7 +216,23 @@ public:
 		for(int i=0;i<nvisible+nhidden;i++)
 			for(int j=0;j<nvisible+nhidden;j++)
 				w[i][j] += rate*dw[i][j];
-
+		
+		///////////////// debug ///////////////////
+		/*
+		cout << "-----------------------\n";
+		for(int i=0;i<nvisible;i++)
+			cout << dbvis[i] << "\t";
+		cout << "\n";
+		for(int i=0;i<nhidden;i++)
+			cout << dbhid[i] << "\t";
+		cout << "\n";
+		for(int i=0;i<nvisible+nhidden;i++){
+			for(int j=0;j<nvisible+nhidden;j++){
+				cout << dw[i][j] << "\t";
+			}
+			cout << "\n";
+		}
+		cout << "-----------------------\n";*/
 	}
 };
 
@@ -386,7 +403,7 @@ int main(){
 	random_device rd;
 	default_random_engine rengine(rd());
 	//////////////// Model 0 /////////////////
-	bm<6,0,default_random_engine> source(rengine);
-	bm<6,0,default_random_engine> learn(rengine);
-	generate_and_learn(source,learn, 0.01,100000, 30000, 10000, 100);
+	bm<3,3,default_random_engine> source(rengine);
+	bm<3,3,default_random_engine> learn(rengine);
+	generate_and_learn(source,learn, 0.01,1000, 30000, 100, 100);
 }
