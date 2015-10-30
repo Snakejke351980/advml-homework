@@ -124,9 +124,11 @@ public:
 		for(int i=0;i<trainsize;i++){
 			// clamp visible
 			copy(&trainingdata[i][0],&trainingdata[i][nvisible],&visible[0]);
+			/* don't wait for "thermal eq"
 			// update hidden and wait until thermal eq
 			for(int j=0;j<samplesize;j++)
 				update_hiddens();
+			*/
 			// sample hidden with visible clamped
 			bool ghidden[samplesize][nhidden];
 			for(int j=0;j<samplesize;j++){
@@ -162,11 +164,13 @@ public:
 				dw[nvisible+i][nvisible+j] = dw[nvisible+j][nvisible+i] = hihj[i][j]/trainsize;
 		
 		///////////////// phase - //////////////////
+		/* don't wait for "thermal eq"
 		// wait until thermal eq
 		for(int i=0;i<samplesize;i++){
 			update_hiddens();
 			update_visibles();
 		}
+		*/
 		{ // use block to keep the stack small
 		bool vishid[samplesize][nvisible+nhidden];
 		// sample visible and hidden
@@ -320,11 +324,13 @@ void generate_and_learn(generate_t &g, learn_t &l, double rate, int trainsize, i
 	int stat_learned[ns];
 	fill(&stat_training[0],&stat_training[ns],0);
 	fill(&stat_learned[0], &stat_learned[ns],0);
+	/* don't wait for "thermal eq"
 	// wait for thermal eq
 	for(int i=0;i<trainsize;i++){
 		g.update_hiddens();
 		g.update_visibles();
 	}
+	*/
 	// generate training data
 	for(int i=0;i<trainsize;i++){
 		g.update_hiddens();
@@ -347,7 +353,7 @@ void generate_and_learn(generate_t &g, learn_t &l, double rate, int trainsize, i
 				for(int j=0;j<nvisible+nhidden;j++)
 					err = max(err,abs(l.w[i][j]-g.w[i][j]));
 		}
-		cout << c << '\t' << err << endl;
+		cout << c << '\t' << err << "\n";
 	}
 	// statistics of learned
 	for(int i=0;i<trainsize;i++){
@@ -360,8 +366,9 @@ void generate_and_learn(generate_t &g, learn_t &l, double rate, int trainsize, i
 		stat_learned[l.idx()]++;
 	}
 	// print statistics
+	cout << "Statistics:\ntraining\tlearned\n";
 	for(int i=0;i<ns;i++)
-		cout << stat_training[i] << "\t" << stat_learned[i] << endl;
+		cout << stat_training[i] << "\t" << stat_learned[i] << "\n";
 }
 
 int main(){
@@ -371,7 +378,5 @@ int main(){
 	//////////////// Model 0 /////////////////
 	bm<6,0,default_random_engine> source(rengine);
 	bm<6,0,default_random_engine> learn(rengine);
-	generate_and_learn(source,learn, 0.01,100000, 100000, 1000, 100);
-	generate_and_learn(source,learn, 0.001,100000, 100000, 1000, 100);
-	generate_and_learn(source,learn, 0.0001,100000, 100000, 1000, 100);
+	generate_and_learn(source,learn, 0.01,100000, 20000, 10000, 100);
 }
