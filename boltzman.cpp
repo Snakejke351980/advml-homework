@@ -403,7 +403,7 @@ int main(){
 	random_device rd;
 	default_random_engine rengine(rd());
 	//////////////// Model 0 /////////////////
-	bm<3,3,default_random_engine> source(rengine);
-	bm<3,3,default_random_engine> learn(rengine);
-	generate_and_learn(source,learn, 0.01,1000, 30000, 100, 100);
+	rbm<3,3,default_random_engine> source(rengine);
+	rbm<3,4,default_random_engine> learn(rengine);
+	generate_and_learn(source,learn, 0.01,10000, 30000, 1, 100);
 }
